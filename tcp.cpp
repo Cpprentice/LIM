@@ -21,7 +21,7 @@ wxConnectionBase *TCPServer::OnAcceptConnection(const wxString& topic)
 
     if ( auth == "Logon" )
     {
-    	TCPConnection* conn = new TCPConnection(this);
+    	TCPConnection* conn = new TCPConnection(this, name);
         conns.push_back(conn);
         wxLogMessage(_T("Connection to %s accepted"), name.c_str());
 
@@ -58,21 +58,31 @@ size_t TCPServer::IDManager()
 	return id;
 }
 
-TCPConnection::TCPConnection(TCPServer* _server) : wxTCPConnection()
+TCPConnection::TCPConnection(TCPServer* _server, wxString _nick) : wxTCPConnection()
 {
 	server = _server;
 	id = server->IDManager();
+	nick = _nick;
 }
 
 bool TCPConnection::OnDisconnect()
 {
 	wxLogMessage(_T("OnDisconnect()"));
+	wxString nick;
 	for( size_t n = 0; n < server->conns.size(); n++)
 	{
 		if( server->conns[n]->id == id)
 		{
+			nick = server->conns[n]->nick;
 			delete server->conns[n];
 			server->conns.erase(server->conns.begin()+n);
+			wxString msg = "[";
+			msg += wxDateTime::Now().FormatTime() + "] " + nick + " disconnected.";
+			for( size_t i = 0; i < server->conns.size(); i++)
+			{
+				server->conns[i]->Advise("logoff", (char*)msg.c_str(), msg.size());
+			}
+			break;
 		}
 	}
 	return true;
@@ -92,6 +102,20 @@ bool TCPConnection::OnPoke(const wxString& topic, const wxString& item, wxChar *
 	return true;
 }
 
+char* TCPConnection::OnRequest(const wxString& topic, const wxString& item, int *size, wxIPCFormat format)
+{
+	if( item == "nicklist")
+	{
+		wxString nicks = "";
+		for( size_t i = 0; i < server->conns.size(); i++)
+		{
+			nicks += server->conns[i]->nick + "\n";
+		}
+		return (char*)nicks.c_str();
+	}
+	return 0;
+}
+
 ConnecTimer::ConnecTimer(TCPServer* _serv, wxString _nick)
 {
 	serv = _serv;
@@ -100,9 +124,10 @@ ConnecTimer::ConnecTimer(TCPServer* _serv, wxString _nick)
 
 void ConnecTimer::Notify()
 {
-	wxString msg = nick + " connected.";
+	wxString msg = "[";
+	msg += wxDateTime::Now().FormatTime() + "] " + nick + " connected.";
 	for( size_t i = 0; i < serv->conns.size(); i++)
 	{
-		serv->conns[i]->Advise("message", (char*)msg.c_str(), msg.size());
+		serv->conns[i]->Advise("logon", (char*)msg.c_str(), msg.size());
 	}
 }

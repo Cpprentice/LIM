@@ -27,11 +27,14 @@ class TCPConnection : public wxTCPConnection
 {
 	friend class TCPServer;
 	public:
-		TCPConnection(TCPServer* _server);
+		TCPConnection(TCPServer* _server, wxString _nick);
 		bool OnDisconnect();
 		bool OnPoke(const wxString& topic, const wxString& item, wxChar *data, int size, wxIPCFormat format);
+		char* OnRequest(const wxString& topic, const wxString& item, int *size, wxIPCFormat format);
+
 	private:
 		size_t id;
+		wxString nick;
 		TCPServer* server;
 };
 
